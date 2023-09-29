@@ -1,0 +1,134 @@
+---
+title: "HW1"
+author: "Anush Aghinyan"
+date: "2023-09-29"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Innovation: Smart sunglasses https://time.com/collection/best-inventions-2022/6229141/deepoptics-32n-adaptive-focus-sunglasses/
+  DeepOptics originally wanted to make goggles for 3D television. But when the founders realized that more people have aging eyes than 3D TVs, they decided to use their vision tech to help people over 45 see both close and far, outside and in. Their first product, named for the latitude of DeepOptics’ hometown of Tel Aviv, has tinted liquid-­crystal lenses that realign into magnifying “readers” when the wearer swipes the temple with a finger. (A companion phone app allows users to set a specific reading magnification level.) A version with transparent lenses, switching between a distance Rx and close-up magnification, is planned.
+  
+  
+# Look-alike Innovation: Usual sunglasses
+ Smart sunglasses is a groundbreaking advancement in eyewear technology, addressing the needs people with vision changes. Unlike traditional sunglasses that simply provide UV protection, DeepOptics' innovation incorporates liquid-crystal lenses that dynamically adjust to meet the wearer's specific visual requirements. With a simple swipe of the temple, these sunglasses transition into magnifying "readers," making it convenient for users to read fine print or text up close. Additionally, the companion phone app allows for precise customization of the magnification level, ensuring a tailored and comfortable viewing experience.
+In contrast, traditional sunglasses serve primarily as a sun-blocking accessory, offering no vision correction capabilities. While they excel in shielding the eyes from harmful UV rays and reducing glare, smart sunglasses represents a better way of doing that due to incorporating that with aiding individuals who require both distance and near vision correction. 
+In summary, DeepOptics' smart sunglasses offer a superior and more adaptive eyewear experience compared to conventional sunglasses, catering specifically to the needs of an aging population with vision challenges.
+ 
+
+# Data
+  The data was obtained from Statista.com.  The statistic shows the smart glass market revenue worldwide in 2018 with projections until 2027. In 2027, the global smart glass market revenue is expected to reach 11.73 billion U.S. dollars. 
+  The predictions were made for the worldwide scope, as the data describes the worldwide sales.
+  For the look alike I fount Revenue of eyewear in the United States from 2014 to 2027, by product type from statista. There were a few product types, I chose sunglasses specifically. 
+  
+```{r}
+```
+
+Loading the libraries.
+
+```{r}
+libs<-c('ggplot2','ggpubr','knitr','diffusion', 'readxl')
+load_libraries<-function(libs){
+new_libs <- libs[!(libs %in% installed.packages()[,"Package"])]
+if(length(new_libs)>0) {install.packages(new_libs)}
+lapply(libs, library, character.only = TRUE)
+}
+load_libraries(libs)
+```
+
+Defining f(t), F(t) functions.
+
+```{r}
+bass.f <- function(t,p,q){
+((p+q)**2/p)*exp(-(p+q)*t)/
+(1+(q/p)*exp(-(p+q)*t))**2
+}
+
+bass.F <- function(t,p,q){
+(1-exp(-(p+q)*t))/
+(1+(q/p)*exp(-(p+q)*t))
+}
+```
+
+Importing the data and doing post-processing.
+
+```{r}
+ss <- read_excel("C:/Users/anush/Desktop/statistic_id1015498_global-smart-glass-market-size-2018-2027.xlsx", sheet=2)
+colnames(ss) <- c("year", "sales")
+names(ss)[1] <- "year"
+names(ss)[2] <- "sales"
+ss$year = as.numeric(ss$year)
+ss$sales = as.numeric(ss$sales) 
+ss
+```
+```{r}
+ggplot(data = ss, aes(x = year, y = sales)) +
+  geom_bar(stat = 'identity') +
+  ggtitle('Smart sunglasses sales, mln units')
+```
+
+Estimate p and q.
+
+```{r}
+parameters <- diffusion(ss$sales)
+p <- parameters$w['p']
+q <- parameters$w['q']
+m <- parameters$w['m']
+
+parameters
+```
+```{r}
+ss$pred_diffusion <- bass.f(1:9, p = p, q = q)*m
+
+ggplot(data = ss, aes(x = year, y = sales)) + geom_bar(stat = 'identity') +
+  geom_point(aes(x=year, y = pred_diffusion), col = 'red')
+```
+Trying another method of estimating the parameters.
+
+```{r}
+sales = ss$sales
+t = 1:length(sales)
+bass_m = nls(sales ~ m*(((p+q)**2/p)*exp(-(p+q)*t))/(1+(q/p)*exp(-(p+q)*t))**2,
+             start=c(list(m=sum(sales),p=0.227,q=0.0)), control = list(maxiter=5000, tol = 8))
+
+bass_m
+```
+```{r}
+p <- bass_m$m$getPars()['p']
+q <- bass_m$m$getPars()['q']
+m <- bass_m$m$getPars()['m']
+
+ss$pred_nls <- bass.f(1:9, p = p, q = q)*m
+
+ggplot(data = ss, aes(x = year, y = sales)) + geom_bar(stat = 'identity') +
+  geom_point(aes(x=year, y = pred_nls), col = 'red')
+```
+
+Will use this estimation for the prediction.
+
+# Prediction
+
+```{r}
+future_years <- 40
+
+prediction <- bass.f(1:future_years, p = p, q = q)*m
+
+years <- seq(from = 2027, to = 2027 + future_years - 1, by = 1)
+
+innovation_df <- data.frame(Year = years, Sales = prediction)
+prediction
+```
+```{r}
+ggplot(data = innovation_df, aes(x = Year, y = Sales)) +
+  geom_bar(stat='identity')
+```
+```{r}
+innovation_df[which.max(innovation_df$Sales),]
+```
+
+As we see from the data, the maximum sales were seen in the year 2027, and in the future years the sales will decrease.
